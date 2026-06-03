@@ -87,12 +87,12 @@ jobs:
           retention-days: 5
 
   publish:
-    name: Publish to TestPyPI
+    name: Publish to PyPI
     needs: [build]
     runs-on: ubuntu-latest
     environment:
-      name: testpypi
-      url: https://test.pypi.org/project/sigstore-a2a/${{ needs.build.outputs.version }}/
+      name: pypi
+      url: https://pypi.org/project/sigstore-a2a/${{ needs.build.outputs.version }}/
     permissions:
       contents: read
       id-token: write
@@ -102,68 +102,66 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+
+  create_github_release:
+    name: Create GitHub Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          repository-url: https://test.pypi.org/legacy/
+          name: dist
+          path: dist/
+      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          files: |
+            dist/*
+          generate_release_notes: true
 
-  # create_github_release:
-  #   name: Create GitHub Release
-  #   needs: [build]
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: write
-  #   steps:
-  #     - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-  #       with:
-  #         name: dist
-  #         path: dist/
-  #     - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-  #       with:
-  #         draft: false
-  #         prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
-  #         files: |
-  #           dist/*
-  #         generate_release_notes: true
-
-  # build_and_push_container:
-  #   name: Build and Push Docker Image
-  #   needs: [publish]
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     id-token: write
-  #     attestations: write
-  #     packages: write
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-  #       with:
-  #         persist-credentials: false
-  #     - name: Login to GitHub Container Registry
-  #       uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
-  #       with:
-  #         registry: ghcr.io
-  #         username: ${{ github.actor }}
-  #         password: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Build image
-  #       id: build_image
-  #       uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2.13
-  #       with:
-  #         containerfiles: |
-  #           ./Containerfile
-  #         image: sigstore/sigstore-a2a
-  #         tags: "latest ${{ github.ref_name }}"
-  #         archs: amd64
-  #         oci: false
-  #     - name: Push image to GHCR
-  #       uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2.8
-  #       id: push
-  #       with:
-  #         image: ${{ steps.build_image.outputs.image }}
-  #         tags: ${{ steps.build_image.outputs.tags }}
-  #         registry: ghcr.io
-  #     - name: Generate artifact attestation
-  #       uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
-  #       with:
-  #         subject-name: ghcr.io/sigstore/sigstore-a2a
-  #         subject-digest: ${{ steps.push.outputs.digest }}
-  #         push-to-registry: true
+  build_and_push_container:
+    name: Build and Push Docker Image
+    needs: [publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        id: build_image
+        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2.13
+        with:
+          containerfiles: |
+            ./Containerfile
+          image: sigstore/sigstore-a2a
+          tags: "latest ${{ github.ref_name }}"
+          archs: amd64
+          oci: false
+      - name: Push image to GHCR
+        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2.8
+        id: push
+        with:
+          image: ${{ steps.build_image.outputs.image }}
+          tags: ${{ steps.build_image.outputs.tags }}
+          registry: ghcr.io
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ghcr.io/sigstore/sigstore-a2a
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
