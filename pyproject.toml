@@ -56,12 +56,10 @@ keywords = [
 sigstore-a2a = "sigstore_a2a.cli.main:cli"
 
 [project.urls]
-Homepage = "<>"
+Homepage = "https://github.com/sigstore/sigstore-a2a"
 Changelog = "https://github.com/sigstore/sigstore-a2a/blob/main/CHANGELOG.md"
-Documentation = "<>"
 Source = "https://github.com/sigstore/sigstore-a2a"
 Issues = "https://github.com/sigstore/sigstore-a2a/issues"
-PyPI = "<>"
 
 [tool.hatch.version]
 path = "sigstore_a2a/__init__.py"
